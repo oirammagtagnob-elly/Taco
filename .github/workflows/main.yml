@@ -33,17 +33,31 @@ jobs:
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Unpack the project
+      - name: Unpack the newest project bundle
         run: |
-          F=$(ls project-bundle.* | head -1)
-          echo "Using $F"
-          base64 -d "$F" > three-remotion.zip
+          best=""; bt=-1
+          for f in project-bundle*; do
+            [ -f "$f" ] || continue
+            t=$(git log -1 --format=%ct -- "$f"); t=${t:-0}
+            echo "found: $f (committed at $t)"
+            if [ "$t" -gt "$bt" ]; then best="$f"; bt=$t; fi
+          done
+          [ -n "$best" ] || { echo "::error::No project-bundle file found in the repo."; exit 1; }
+          echo "Using: $best"
+          base64 -d "$best" > three-remotion.zip
+          rm -rf three-remotion
           unzip -q -o three-remotion.zip
+          if [ "${{ inputs.video }}" = "millennium" ] && ! grep -q 'id="Millennium"' three-remotion/src/Root.tsx; then
+            echo "::error::The bundle '$best' is old: it has no Millennium video. Upload the newest project-bundle.txt to the repo, then run again."
+            exit 1
+          fi
 
       - name: Install system libraries for Chrome
         run: >
