@@ -3,6 +3,11 @@ name: Render video
 on:
   workflow_dispatch:
     inputs:
+      video:
+        description: "Which video to render"
+        type: choice
+        options: [tacoma, millennium]
+        default: millennium
       quality:
         description: "draft = half size and fast, full = final quality"
         type: choice
@@ -53,7 +58,7 @@ jobs:
         run: bash setup.sh
 
       - name: Make the voiceover
-        if: ${{ inputs.voice }}
+        if: ${{ inputs.voice && inputs.video == 'tacoma' }}
         working-directory: three-remotion
         env:
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
@@ -73,11 +78,13 @@ jobs:
           echo "{\"vertical\": $VERT, \"showCaptions\": ${{ inputs.captions }}}" > props-run.json
           ARGS="--gl=swangle --props=props-run.json"
           if [ "${{ inputs.quality }}" = "draft" ]; then ARGS="$ARGS --scale=0.5"; fi
-          npx remotion render src/index.ts MainVideo out/video.mp4 $ARGS
+          COMP=MainVideo
+          if [ "${{ inputs.video }}" = "millennium" ]; then COMP=Millennium; fi
+          npx remotion render src/index.ts $COMP out/video.mp4 $ARGS
 
       - name: Save the video
         uses: actions/upload-artifact@v4
         with:
-          name: tacoma-video
+          name: ${{ inputs.video }}-video
           path: three-remotion/out/video.mp4
           retention-days: 7
